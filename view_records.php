@@ -1,5 +1,12 @@
 <?php
 require_once 'config.php';
+require_once 'auth.php';
+
+$pdo = getDBConnection();
+$auth = new Auth($pdo);
+
+// Require login
+$auth->requireLogin();
 
 $message = '';
 $records = [];
@@ -289,6 +296,13 @@ closeDBConnection($pdo);
         </div>
         
         <div class="content">
+            <!-- User Info -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <p style="margin: 5px 0; color: #2c3e50;"><strong>Logged in as:</strong> <?php echo htmlspecialchars($_SESSION['full_name']); ?></p>
+                <p style="margin: 5px 0; color: #2c3e50;"><strong>Demo Code:</strong> <?php echo htmlspecialchars($_SESSION['demo_code']); ?></p>
+                <a href="logout.php" style="color: #e74c3c; text-decoration: none; font-weight: 500;">Logout</a>
+            </div>
+            
             <?php if ($message): ?>
                 <div class="message success">
                     <?php echo htmlspecialchars($message); ?>
@@ -387,11 +401,10 @@ closeDBConnection($pdo);
                                         <div class="actions">
                                             <a href="edit_record.php?id=<?php echo $record['id']; ?>" 
                                                class="btn btn-secondary">Edit</a>
-                                            <form method="POST" action="" style="display: inline;" 
-                                                  onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                                <input type="hidden" name="delete_id" value="<?php echo $record['id']; ?>">
-                                                <button type="submit" class="btn btn-danger">Delete</button>
-                                            </form>
+                                                                                         <button type="button" class="btn btn-danger" 
+                                                     onclick="confirmDelete(<?php echo $record['id']; ?>, '<?php echo htmlspecialchars($record['first_name'] . ' ' . $record['last_name']); ?>')">
+                                                 Delete
+                                             </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -406,5 +419,19 @@ closeDBConnection($pdo);
             </div>
         </div>
     </div>
+    
+    <!-- Hidden form for delete -->
+    <form id="deleteForm" method="POST" action="" style="display: none;">
+        <input type="hidden" name="delete_id" id="deleteId">
+    </form>
+    
+    <script>
+        function confirmDelete(recordId, recordName) {
+            if (confirm(`Are you sure you want to delete the record for "${recordName}"?\n\nThis action cannot be undone.`)) {
+                document.getElementById('deleteId').value = recordId;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+    </script>
 </body>
 </html> 

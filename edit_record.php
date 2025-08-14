@@ -11,7 +11,16 @@ $auth->requireLogin();
 
 $message = '';
 $messageType = '';
+$record = null;
 $formData = [];
+
+// Get record ID from URL
+$recordId = $_GET['id'] ?? null;
+
+if (!$recordId) {
+    header('Location: view_records.php?error=invalid_id');
+    exit();
+}
 
 // Get departments for dropdown
 function getDepartments($pdo) {
@@ -23,9 +32,19 @@ function getDepartments($pdo) {
     }
 }
 
+// Get record by ID
+function getRecordById($pdo, $id) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM faculty_records WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch(PDOException $e) {
+        return null;
+    }
+}
+
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $pdo = getDBConnection();
     $validator = new DataValidator();
     
     // Validate and sanitize all inputs
@@ -44,32 +63,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $emergencyContact = $validator->validateEmergencyContact($_POST['emergency_contact'] ?? '');
     $emergencyPhone = $validator->validateEmergencyPhone($_POST['emergency_phone'] ?? '');
     
-    // Check for duplicate email and employee ID
+    // Check for duplicate email and employee ID (excluding current record)
     if (!$validator->hasErrors()) {
-        $validator->checkEmailExists($email, $pdo);
-        $validator->checkEmployeeIdExists($employeeId, $pdo);
+        $validator->checkEmailExists($email, $pdo, $recordId);
+        $validator->checkEmployeeIdExists($employeeId, $pdo, $recordId);
     }
     
-    // If no validation errors, insert into database
+    // If no validation errors, update database
     if (!$validator->hasErrors()) {
         try {
-            $sql = "INSERT INTO faculty_records (employee_id, first_name, last_name, email, phone, 
-                    date_of_birth, hire_date, position, department_id, salary, qualification, 
-                    address, emergency_contact, emergency_phone) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "UPDATE faculty_records SET 
+                    employee_id = ?, first_name = ?, last_name = ?, email = ?, phone = ?, 
+                    date_of_birth = ?, hire_date = ?, position = ?, department_id = ?, salary = ?, 
+                    qualification = ?, address = ?, emergency_contact = ?, emergency_phone = ? 
+                    WHERE id = ?";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 $employeeId, $firstName, $lastName, $email, $phone, $dateOfBirth, 
                 $hireDate, $position, $departmentId, $salary, $qualification, 
-                $address, $emergencyContact, $emergencyPhone
+                $address, $emergencyContact, $emergencyPhone, $recordId
             ]);
             
-            $message = "Faculty record added successfully!";
+            $message = "Record updated successfully!";
             $messageType = "success";
             
-            // Clear form data after successful submission
-            $formData = [];
+            // Redirect to view records after successful update
+            header('Location: view_records.php?message=updated');
+            exit();
             
         } catch(PDOException $e) {
             $message = "Database error: " . $e->getMessage();
@@ -82,12 +103,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Preserve form data for re-display
         $formData = $_POST;
     }
+} else {
+    // Get record data for editing
+    $record = getRecordById($pdo, $recordId);
     
-    closeDBConnection($pdo);
+    if (!$record) {
+        header('Location: view_records.php?error=record_not_found');
+        exit();
+    }
+    
+    // Pre-fill form data
+    $formData = $record;
 }
 
 // Get departments for dropdown
-$pdo = getDBConnection();
 $departments = getDepartments($pdo);
 closeDBConnection($pdo);
 ?>
@@ -97,7 +126,7 @@ closeDBConnection($pdo);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>College Department Records - Faculty Management</title>
+    <title>Edit Faculty Record - College Department Records</title>
     <style>
         * {
             margin: 0;
@@ -122,7 +151,7 @@ closeDBConnection($pdo);
         }
         
         .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -194,8 +223,8 @@ closeDBConnection($pdo);
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #f39c12;
+            box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.1);
         }
         
         .form-group textarea {
@@ -211,7 +240,7 @@ closeDBConnection($pdo);
         }
         
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
             color: white;
             padding: 15px 30px;
             border: none;
@@ -224,7 +253,7 @@ closeDBConnection($pdo);
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 20px rgba(243, 156, 18, 0.3);
         }
         
         .btn-secondary {
@@ -251,6 +280,19 @@ closeDBConnection($pdo);
             margin-top: 5px;
         }
         
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .user-info p {
+            margin: 5px 0;
+            color: #2c3e50;
+        }
+        
         @media (max-width: 768px) {
             .form-grid {
                 grid-template-columns: 1fr;
@@ -269,16 +311,15 @@ closeDBConnection($pdo);
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏫 College Department Records</h1>
-            <p>Faculty & Staff Management System</p>
+            <h1>✏️ Edit Faculty Record</h1>
+            <p>Update faculty and staff information</p>
         </div>
         
         <div class="content">
             <!-- User Info -->
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-                <p style="margin: 5px 0; color: #2c3e50;"><strong>Logged in as:</strong> <?php echo htmlspecialchars($_SESSION['full_name']); ?></p>
-                <p style="margin: 5px 0; color: #2c3e50;"><strong>Demo Code:</strong> <?php echo htmlspecialchars($_SESSION['demo_code']); ?></p>
-                <a href="logout.php" style="color: #e74c3c; text-decoration: none; font-weight: 500;">Logout</a>
+            <div class="user-info">
+                <p><strong>Logged in as:</strong> <?php echo htmlspecialchars($_SESSION['full_name']); ?></p>
+                <p><strong>Demo Code:</strong> <?php echo htmlspecialchars($_SESSION['demo_code']); ?></p>
             </div>
             
             <?php if ($message): ?>
@@ -451,8 +492,8 @@ closeDBConnection($pdo);
                 </div>
                 
                 <div class="form-actions">
-                    <button type="submit" class="btn">Add Faculty Record</button>
-                    <a href="view_records.php" class="btn btn-secondary">View All Records</a>
+                    <button type="submit" class="btn">Update Record</button>
+                    <a href="view_records.php" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
         </div>

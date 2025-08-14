@@ -4,6 +4,7 @@ A comprehensive PHP-based web application for managing faculty and staff records
 
 ## Features
 
+- **Secure Authentication System**: Login/Register with demo code generation
 - **Complete CRUD Operations**: Add, view, edit, and delete faculty records
 - **Data Validation & Sanitization**: Comprehensive input validation and XSS protection
 - **Modern UI/UX**: Responsive design with beautiful gradients and animations
@@ -11,6 +12,8 @@ A comprehensive PHP-based web application for managing faculty and staff records
 - **Statistics Dashboard**: View total records, departments, and salary budget
 - **Database Security**: Prepared statements to prevent SQL injection
 - **Mobile Responsive**: Works perfectly on all device sizes
+- **Confirmation Dialogs**: Secure delete operations with user confirmation
+- **Brute Force Protection**: Login attempt limiting for security
 
 ## Database Schema
 
@@ -38,6 +41,30 @@ A comprehensive PHP-based web application for managing faculty and staff records
    - emergency_contact
    - emergency_phone
    - created_at, updated_at
+
+3. **users** - Stores user authentication data
+   - id (Primary Key)
+   - username (Unique)
+   - email (Unique)
+   - password_hash
+   - full_name
+   - role (admin/user)
+   - is_active
+   - demo_code (Unique)
+   - created_at, last_login
+   - password_reset_token, password_reset_expires
+
+4. **user_sessions** - Manages user sessions
+   - id (Primary Key)
+   - user_id (Foreign Key)
+   - session_token (Unique)
+   - ip_address, user_agent
+   - created_at, expires_at
+
+5. **login_attempts** - Tracks login attempts for security
+   - id (Primary Key)
+   - username, ip_address
+   - attempted_at, success
 
 ## Input Fields (14 Total)
 
@@ -117,6 +144,7 @@ A comprehensive PHP-based web application for managing faculty and staff records
 3. **Create Database**
    - Open phpMyAdmin: http://localhost/phpmyadmin
    - Import the `database.sql` file
+   - Import the `users.sql` file
    - Or run the SQL commands manually
 
 4. **Configure Database Connection**
@@ -128,8 +156,16 @@ A comprehensive PHP-based web application for managing faculty and staff records
      - Database: college_department_db
 
 5. **Access the Application**
-   - Open browser: http://localhost/datavalidationandsanitization/
-   - Or: http://localhost/datavalidationandsanitization/index.php
+   - Open browser: http://localhost/datavalidationandsanitization/login.php
+   - Default admin credentials:
+     - Username: admin
+     - Password: Admin@123
+     - Demo Code: DEMO2024
+
+6. **Register New Users**
+   - Click "Register here" on login page
+   - Create new accounts with strong passwords
+   - Each user gets a unique demo code
 
 ## File Structure
 
@@ -138,9 +174,14 @@ datavalidationandsanitization/
 ├── index.php              # Main form for adding records
 ├── view_records.php       # View all records with search/filter
 ├── edit_record.php        # Edit existing records
+├── login.php              # User authentication login
+├── register.php           # User registration
+├── logout.php             # Secure logout
+├── auth.php               # Authentication class
 ├── config.php             # Database configuration
 ├── validation.php         # Data validation and sanitization class
 ├── database.sql           # Database schema and sample data
+├── users.sql              # User authentication tables
 └── README.md              # This file
 ```
 
@@ -167,13 +208,28 @@ datavalidationandsanitization/
 - ENT_QUOTES flag for complete protection
 - UTF-8 encoding
 
+### Authentication Security
+- Password hashing with bcrypt
+- Session management with regeneration
+- Brute force protection (5 attempts per 15 minutes)
+- Unique demo codes for each user
+- Password strength validation
+- Secure logout with session cleanup
+
 ## Usage
 
+### Authentication
+1. **Login**: Use username/password or register new account
+2. **Registration**: Create account with strong password requirements
+3. **Demo Code**: Each user gets a unique demo code for identification
+4. **Logout**: Secure logout with session cleanup
+
 ### Adding Records
-1. Navigate to the main page
-2. Fill in all required fields
-3. Submit the form
-4. View success/error messages
+1. Login to the system
+2. Navigate to the main page
+3. Fill in all required fields
+4. Submit the form
+5. View success/error messages
 
 ### Viewing Records
 1. Click "View All Records" button
@@ -188,7 +244,7 @@ datavalidationandsanitization/
 
 ### Deleting Records
 1. Click "Delete" button on any record
-2. Confirm the deletion
+2. Confirm the deletion with name confirmation
 3. Record is permanently removed
 
 ## Sample Data
